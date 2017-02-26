@@ -41,7 +41,7 @@ DEALINGS IN THE SOFTWARE.
     var recording = false,
       currCallback;
 
-    this.node.onaudioprocess = function(e){
+    this.node.onaudioprocess = function(e){;
       if (!recording) return;
       worker.postMessage({
         command: 'record',

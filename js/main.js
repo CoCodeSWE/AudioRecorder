@@ -32,7 +32,7 @@ var recIndex = 0;
 */
 
 function saveAudio() {
-    audioRecorder.exportWAV( doneEncoding );
+    audioRecorder.exportMonoWAV( doneEncoding );
     // could get mono instead by saying
     // audioRecorder.exportMonoWAV( doneEncoding );
 }
@@ -44,7 +44,7 @@ function gotBuffers( buffers ) {
 
     // the ONLY time gotBuffers is called is right after a new recording is completed - 
     // so here's where we should set up the download.
-    audioRecorder.exportWAV( doneEncoding );
+    audioRecorder.exportMonoWAV( doneEncoding );
 }
 
 function doneEncoding( blob ) {
@@ -83,6 +83,21 @@ function cancelAnalyserUpdates() {
     rafID = null;
 }
 
+ function getAverageVolume(array) {
+        var values = 0;
+        var average;
+
+        var length = array.length;
+
+        // get all the frequency amplitudes
+        for (var i = 0; i < length; i++) {
+            values += array[i];
+        }
+
+        average = values / length;
+        return average;
+  }
+
 function updateAnalysers(time) {
     if (!analyserContext) {
         var canvas = document.getElementById("analyser");
@@ -97,9 +112,9 @@ function updateAnalysers(time) {
         var BAR_WIDTH = 1;
         var numBars = Math.round(canvasWidth / SPACING);
         var freqByteData = new Uint8Array(analyserNode.frequencyBinCount);
-
+        var timeByteData = new Float32Array(analyserNode.fftSize);
         analyserNode.getByteFrequencyData(freqByteData); 
-
+        analyserNode.getFloatTimeDomainData(timeByteData);
         analyserContext.clearRect(0, 0, canvasWidth, canvasHeight);
         analyserContext.fillStyle = '#F6D565';
         analyserContext.lineCap = 'round';
@@ -113,10 +128,12 @@ function updateAnalysers(time) {
             for (var j = 0; j< multiplier; j++)
                 magnitude += freqByteData[offset + j];
             magnitude = magnitude / multiplier;
-            var magnitude2 = freqByteData[i * multiplier];
             analyserContext.fillStyle = "hsl( " + Math.round((i*360)/numBars) + ", 100%, 50%)";
             analyserContext.fillRect(i * SPACING, canvasHeight, BAR_WIDTH, -magnitude);
         }
+        var volume = getAverageVolume(timeByteData);
+        if(volume > 0.0002)
+          console.log(volume);
     }
     
     rafID = window.requestAnimationFrame( updateAnalysers );
@@ -159,14 +176,14 @@ function gotStream(stream) {
 }
 
 function initAudio() {
-        if (!navigator.getUserMedia)
-            navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        if (!navigator.mediaDevices.getUserMedia)
+            navigator.mediaDevices.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
         if (!navigator.cancelAnimationFrame)
             navigator.cancelAnimationFrame = navigator.webkitCancelAnimationFrame || navigator.mozCancelAnimationFrame;
         if (!navigator.requestAnimationFrame)
             navigator.requestAnimationFrame = navigator.webkitRequestAnimationFrame || navigator.mozRequestAnimationFrame;
 
-    navigator.getUserMedia(
+    navigator.mediaDevices.getUserMedia(
         {
             "audio": {
                 "mandatory": {
@@ -177,7 +194,7 @@ function initAudio() {
                 },
                 "optional": []
             },
-        }, gotStream, function(e) {
+        }).then(gotStream).catch(function(e) {
             alert('Error getting audio');
             console.log(e);
         });
